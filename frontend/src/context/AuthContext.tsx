@@ -58,33 +58,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("kartavya_theme", "light");
     document.documentElement.classList.remove("dark");
 
-    // Load sample users & initial session
-    const initAuth = async () => {
+    // Load sample users & initial session with serverless cold-start retry & fallback resilience
+    const initAuth = async (isRetry = false) => {
       try {
         const users = await api.getSampleUsers();
-        setSampleUsers(users);
+        if (users && users.length > 0) {
+          setSampleUsers(users);
 
-        const existingToken = getAuthToken();
-        if (existingToken) {
-          try {
-            const me = await api.getMe();
-            setUser(me);
-          } catch {
-            // Default to Alex Morgan (Manager) if token expired or demo mode
-            if (users.length > 0) {
-              const defaultUser = users[0]; // Alex Morgan
-              setAuthToken(defaultUser.access_token);
+          const existingToken = getAuthToken();
+          if (existingToken) {
+            try {
+              const me = await api.getMe();
+              setUser(me);
+            } catch {
+              const defaultUser = users[0];
+              setAuthToken(defaultUser.access_token || "");
               setUser(defaultUser);
             }
+          } else {
+            const defaultUser = users[0];
+            setAuthToken(defaultUser.access_token || "");
+            setUser(defaultUser);
           }
-        } else if (users.length > 0) {
-          // Auto-sign in as Alex Morgan for instantaneous demo readiness
-          const defaultUser = users[0];
-          setAuthToken(defaultUser.access_token);
-          setUser(defaultUser);
         }
       } catch (err) {
-        console.error("Auth init error:", err);
+        console.warn("Auth initialization notice:", err);
+        if (!isRetry) {
+          // Retry once after 1.5s to handle serverless cold boot
+          setTimeout(() => initAuth(true), 1500);
+          return;
+        }
+        // Fallback demo users for graceful UI rendering during backend maintenance
+        const fallbackUsers: User[] = [
+          {
+            id: 1,
+            email: "alex.morgan@company.internal",
+            full_name: "Alex Morgan",
+            role: "Manager",
+            title: "Engineering Manager",
+            department: "Core Payments",
+            avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+          },
+          {
+            id: 2,
+            email: "sarah.lin@company.internal",
+            full_name: "Sarah Lin",
+            role: "Staff Engineer (Departing)",
+            title: "Staff Lead L6",
+            department: "Core Payments",
+            avatar_url: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80",
+          },
+          {
+            id: 3,
+            email: "marcus.vance@company.internal",
+            full_name: "Marcus Vance",
+            role: "Successor",
+            title: "Senior L5 Successor",
+            department: "Core Payments",
+            avatar_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+          },
+        ];
+        setSampleUsers(fallbackUsers);
+        setUser(fallbackUsers[0]);
       } finally {
         setLoading(false);
       }

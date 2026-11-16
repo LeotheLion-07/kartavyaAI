@@ -1,4 +1,32 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+/**
+ * Resolves the backend API base URL dynamically:
+ * 1. Explicit NEXT_PUBLIC_API_URL if configured in environment (e.g. Render/Railway backend URL or custom proxy).
+ * 2. In browser environments:
+ *    - If hostname is localhost or 127.0.0.1, connect directly to http://localhost:8000/api/v1 for local dev.
+ *    - If deployed on Vercel or any public domain (e.g. *.vercel.app), use relative path "/api/v1".
+ *      This routes requests to the current origin, leveraging Vercel rewrites and preventing
+ *      Mixed Content (HTTPS -> HTTP) and CORS "Failed to fetch" errors.
+ * 3. On SSR / Node: fallback to BACKEND_URL or http://localhost:8000/api/v1.
+ */
+export function getApiBase(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "");
+  }
+
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
+    if (!isLocalhost) {
+      return "/api/v1";
+    }
+  }
+
+  if (process.env.BACKEND_URL) {
+    return `${process.env.BACKEND_URL.replace(/\/+$/, "")}/api/v1`;
+  }
+
+  return "http://localhost:8000/api/v1";
+}
 
 export function getAuthToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -28,17 +56,33 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const base = getApiBase();
+  const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const url = `${base}${cleanEndpoint}`;
 
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(errorData.detail || `Request failed with status ${res.status}`);
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(errorData.detail || `Request failed with status ${res.status}`);
+    }
+
+    return res.json();
+  } catch (err: any) {
+    if (err.name === "TypeError" && err.message?.toLowerCase().includes("fetch")) {
+      const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+      const hint = isLocal
+        ? "Ensure the backend server is running on http://localhost:8000 (cd backend && python main.py)."
+        : `Backend unreachable at ${url}. In Vercel Settings > Environment Variables, configure NEXT_PUBLIC_API_URL or verify your backend deployment.`;
+      console.error(`[Kartavya AI Network Error] Failed to reach ${url}: ${err.message}. ${hint}`);
+      throw new Error(`Failed to connect to backend API (${cleanEndpoint}). ${hint}`);
+    }
+    throw err;
   }
-
-  return res.json();
 }
 
 export const api = {

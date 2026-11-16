@@ -13,7 +13,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     
     # Database: Default to local SQLite for instant zero-dependency execution, configurable to PostgreSQL + pgvector
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./kartavya.db")
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        "sqlite:////tmp/kartavya.db" if os.getenv("VERCEL") else "sqlite:///./kartavya.db"
+    )
     
     # LLM Settings
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY", None)
@@ -29,10 +32,11 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://localhost:8000",
         "http://127.0.0.1:8000",
+        "https://*.vercel.app",
         "*"
     ]
     
-    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "./uploads")
+    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "/tmp/uploads" if os.getenv("VERCEL") else "./uploads")
 
     class Config:
         case_sensitive = True

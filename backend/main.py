@@ -31,26 +31,30 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=r"^https:\/\/.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Mount API Routers
-app.include_router(auth.router, prefix=settings.API_V1_STR)
-app.include_router(projects.router, prefix=settings.API_V1_STR)
-app.include_router(sources.router, prefix=settings.API_V1_STR)
-app.include_router(claims.router, prefix=settings.API_V1_STR)
-app.include_router(decisions.router, prefix=settings.API_V1_STR)
-app.include_router(conflicts.router, prefix=settings.API_V1_STR)
-app.include_router(gaps.router, prefix=settings.API_V1_STR)
-app.include_router(handovers.router, prefix=settings.API_V1_STR)
-app.include_router(chat.router, prefix=settings.API_V1_STR)
-app.include_router(permissions.router, prefix=settings.API_V1_STR)
-app.include_router(audit.router, prefix=settings.API_V1_STR)
-app.include_router(analytics.router, prefix=settings.API_V1_STR)
+# Mount API Routers under /api/v1 and fallback /v1
+for prefix in [settings.API_V1_STR, "/v1"]:
+    app.include_router(auth.router, prefix=prefix)
+    app.include_router(projects.router, prefix=prefix)
+    app.include_router(sources.router, prefix=prefix)
+    app.include_router(claims.router, prefix=prefix)
+    app.include_router(decisions.router, prefix=prefix)
+    app.include_router(conflicts.router, prefix=prefix)
+    app.include_router(gaps.router, prefix=prefix)
+    app.include_router(handovers.router, prefix=prefix)
+    app.include_router(chat.router, prefix=prefix)
+    app.include_router(permissions.router, prefix=prefix)
+    app.include_router(audit.router, prefix=prefix)
+    app.include_router(analytics.router, prefix=prefix)
 
 @app.get("/")
+@app.get("/api")
+@app.get("/api/v1")
 def root():
     return {
         "platform": settings.PROJECT_NAME,
@@ -61,6 +65,7 @@ def root():
     }
 
 @app.get("/health")
+@app.get("/api/health")
 def health_check():
     return {"status": "healthy", "service": "kartavya-ai-core"}
 
