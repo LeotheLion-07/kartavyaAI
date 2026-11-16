@@ -53,6 +53,7 @@ export function GroundedChatView() {
         role: "assistant",
         content: res.answer,
         isGrounded: res.is_grounded,
+        hasConflict: res.has_conflict,
         citations: res.citations || [],
         redactedCount: res.redacted_items_count,
       };
@@ -115,6 +116,12 @@ export function GroundedChatView() {
                   : "bg-white border border-[#E5D5BF] text-[#222B25] shadow-2xs"
               }`}
             >
+              {msg.hasConflict && (
+                <div className="p-2.5 rounded-xl bg-[#FAF0E6] border border-[#E5D5BF] text-[11px] text-[#7A3E2D] font-medium flex items-center space-x-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#7A3E2D] animate-ping" />
+                  <span>Unresolved Contradiction Detected Across Sources — Directing to Conflict Management</span>
+                </div>
+              )}
               <div className="whitespace-pre-line font-sans">{msg.content}</div>
 
               {/* Citations Box */}

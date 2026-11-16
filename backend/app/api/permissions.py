@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
 from app.core.database import get_db
-from app.core.security import get_current_user, require_roles
+from app.core.security import get_current_user, require_roles, is_manager_or_admin, log_audit_event
 from app.models.models import AccessRequest, User, AuditLog
 from app.schemas.schemas import AccessRequestCreate, AccessRequestReview, AccessRequestResponse
 
@@ -94,6 +94,23 @@ def review_access_request(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Only Managers or Admins can review/approve access requests
+    if not is_manager_or_admin(current_user):
+        log_audit_event(
+            db=db,
+            user_id=current_user.id,
+            user_name=current_user.full_name,
+            user_role=current_user.role,
+            action="RESTRICTED_ACCESS_DENIED",
+            entity_type="AccessRequest",
+            entity_id=str(request_id),
+            details_json={"reason": "Unauthorized review attempt: Manager or Admin role required"}
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: Only authorized managers or administrators can review access requests."
+        )
+
     req = db.query(AccessRequest).filter(AccessRequest.id == request_id).first()
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
@@ -103,16 +120,17 @@ def review_access_request(
     req.reviewed_by_id = current_user.id
     req.reviewed_at = datetime.now(timezone.utc)
     
-    audit = AuditLog(
+    action_name = "ACCESS_APPROVAL" if review_in.status.lower() == "approved" else f"ACCESS_{review_in.status.upper()}"
+    log_audit_event(
+        db=db,
         user_id=current_user.id,
         user_name=current_user.full_name,
         user_role=current_user.role,
-        action=f"ACCESS_{review_in.status.upper()}",
+        action=action_name,
         entity_type="AccessRequest",
         entity_id=str(req.id),
         details_json={"resource": req.resource_name, "status": req.status, "reviewer": current_user.full_name}
     )
-    db.add(audit)
     db.commit()
     db.refresh(req)
     

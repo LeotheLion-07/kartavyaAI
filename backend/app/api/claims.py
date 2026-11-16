@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
-from app.core.security import get_current_user, get_optional_current_user
+from app.core.security import get_current_user, get_optional_current_user, verify_project_membership, log_audit_event
 from app.core.dlp import redact_claim_if_restricted, mask_sensitive_tokens
 from app.models.models import Claim, ClaimVersion, Source, User, AuditLog, AccessRequest
 from app.schemas.schemas import ClaimCreate, ClaimUpdate, ClaimResponse, ClaimVersionResponse
@@ -17,6 +17,20 @@ def list_claims(
     current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db)
 ):
+    if project_id and current_user:
+        if not verify_project_membership(project_id, current_user, db):
+            log_audit_event(
+                db=db,
+                user_id=current_user.id,
+                user_name=current_user.full_name,
+                user_role=current_user.role,
+                action="RESTRICTED_ACCESS_DENIED",
+                entity_type="Project",
+                entity_id=str(project_id),
+                details_json={"reason": "User not a member of project"}
+            )
+            raise HTTPException(status_code=403, detail="Access denied: User is not a member of this project")
+
     query = db.query(Claim)
     if project_id:
         query = query.filter(Claim.project_id == project_id)
@@ -53,6 +67,8 @@ def list_claims(
             "title": c.title,
             "description": c.description,
             "category": c.category,
+            "entity_or_subject": c.entity_or_subject,
+            "extracted_value": c.extracted_value,
             "evidence_status": c.evidence_status,
             "confidence_score": c.confidence_score,
             "verification_method": c.verification_method,
@@ -93,6 +109,9 @@ def get_claim(
     claim = db.query(Claim).filter(Claim.id == claim_id).first()
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
+
+    if current_user and not verify_project_membership(claim.project_id, current_user, db):
+        raise HTTPException(status_code=403, detail="Access denied: User is not a member of this project")
         
     user_role = current_user.role if current_user else "Incoming"
     user_id = current_user.id if current_user else None
@@ -113,6 +132,8 @@ def get_claim(
         "title": claim.title,
         "description": claim.description,
         "category": claim.category,
+        "entity_or_subject": claim.entity_or_subject,
+        "extracted_value": claim.extracted_value,
         "evidence_status": claim.evidence_status,
         "confidence_score": claim.confidence_score,
         "verification_method": claim.verification_method,
@@ -134,6 +155,28 @@ def get_claim(
     }
     
     redacted = redact_claim_if_restricted(c_dict, user_role, user_id, approved_claim_ids)
+    if redacted.get("is_redacted"):
+        log_audit_event(
+            db=db,
+            user_id=user_id,
+            user_name=current_user.full_name if current_user else "Anonymous",
+            user_role=user_role,
+            action="RESTRICTED_ACCESS_DENIED",
+            entity_type="Claim",
+            entity_id=claim.claim_code,
+            details_json={"classification": claim.access_classification, "reason": "Restricted claim accessed without approval"}
+        )
+    else:
+        log_audit_event(
+            db=db,
+            user_id=user_id,
+            user_name=current_user.full_name if current_user else "Anonymous",
+            user_role=user_role,
+            action="CLAIM_RETRIEVAL",
+            entity_type="Claim",
+            entity_id=claim.claim_code,
+            details_json={"title": claim.title}
+        )
     
     # Fetch version history
     versions = db.query(ClaimVersion).filter(ClaimVersion.claim_id == claim_id).order_by(ClaimVersion.version_num.desc()).all()

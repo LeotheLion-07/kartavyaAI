@@ -31,9 +31,26 @@ export function Sidebar({ activeTab, setActiveTab, gapsCount = 3 }: SidebarProps
 
   return (
     <aside className="w-64 border-r border-[#E5D5BF] bg-[#FAF5EE] p-4 flex flex-col justify-between hidden md:flex shrink-0 min-h-[calc(100vh-3.75rem)]">
-      <div className="space-y-6">
+      <div className="space-y-5">
+        {/* Handover Vault Tamper-proof Header Box from Image 2 */}
+        <div className="flex items-center space-x-2.5 px-2 py-1.5 border-b border-[#E5D5BF] pb-4">
+          <div className="w-8 h-8 rounded-lg bg-[#4E5D52] flex items-center justify-center text-white shadow-xs">
+            <ShieldCheck className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wider text-[#222B25]">
+              Handover Vault
+            </div>
+            <div className="text-[10px] text-[#5E6F63] flex items-center space-x-1 font-mono">
+              <span>v2.4</span>
+              <span>•</span>
+              <span className="font-semibold text-[#4E5D52]">Tamper-proof</span>
+            </div>
+          </div>
+        </div>
+
         <div>
-          <div className="flex items-center space-x-2 px-3 py-1.5 text-xs font-semibold text-[#8B968D] uppercase tracking-wider">
+          <div className="flex items-center space-x-2 px-2 py-1 text-[11px] font-semibold text-[#8B968D] uppercase tracking-wider">
             <span>Navigation</span>
           </div>
           <div className="mt-2 space-y-1">

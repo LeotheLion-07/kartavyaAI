@@ -128,7 +128,11 @@ export const api = {
     if (params?.status) query.append("resolution_status", params.status);
     return request<any[]>(`/conflicts/?${query.toString()}`);
   },
-  resolveConflict: (id: number, data: { resolution_notes: string; accepted_fix?: string }) =>
+  detectConflicts: (projectId: number) =>
+    request<any>(`/conflicts/detect?project_id=${projectId}`, {
+      method: "POST",
+    }),
+  resolveConflict: (id: number, data: { resolution_notes: string; accepted_fix?: string; resolution_status?: string }) =>
     request<any>(`/conflicts/${id}/resolve`, {
       method: "POST",
       body: JSON.stringify(data),
@@ -141,6 +145,10 @@ export const api = {
     if (params?.status) query.append("status", params.status);
     return request<any[]>(`/gaps/?${query.toString()}`);
   },
+  detectGaps: (projectId: number) =>
+    request<any>(`/gaps/detect?project_id=${projectId}`, {
+      method: "POST",
+    }),
   answerGapQuestion: (id: number, data: { answer: string; respondent_name?: string }) =>
     request<any>(`/gaps/${id}/answer`, {
       method: "POST",
@@ -178,6 +186,7 @@ export const api = {
       query: string;
       answer: string;
       is_grounded: boolean;
+      has_conflict?: boolean;
       evidence_count: number;
       citations: any[];
       redacted_items_count: number;

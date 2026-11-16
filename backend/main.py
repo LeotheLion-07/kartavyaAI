@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.core.database import engine, Base, SessionLocal
+from app.core.database import engine, Base, SessionLocal, sync_database_schema
 from app.data.seed_data import seed_database
 from app.api import (
     auth, projects, sources, claims, decisions,
@@ -11,6 +11,8 @@ from app.api import (
 
 # Initialize database tables
 Base.metadata.create_all(bind=engine)
+# Ensure schema backward-compatibility for enhanced columns
+sync_database_schema(engine)
 
 # Seed with enterprise demo records on boot
 try:

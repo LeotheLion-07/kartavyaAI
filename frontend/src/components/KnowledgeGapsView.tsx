@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Send,
   Plus,
+  Sparkles,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -96,13 +97,30 @@ export function KnowledgeGapsView() {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowNewQModal(true)}
-          className="py-2 px-3.5 rounded-xl bg-[#4E5D52] hover:bg-[#3A473E] text-white text-xs font-semibold flex items-center space-x-1.5 shadow-xs transition-colors shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Ask Gap Question</span>
-        </button>
+        <div className="flex items-center space-x-2 shrink-0">
+          <button
+            onClick={async () => {
+              try {
+                const res = await api.detectGaps(currentProject.id);
+                fetchQuestions();
+                alert(`Identified ${res.questions_generated} knowledge gaps across 10 project dimensions!`);
+              } catch (e: any) {
+                alert(`Scan error: ${e.message}`);
+              }
+            }}
+            className="py-2 px-3.5 rounded-xl border border-[#E5D5BF] bg-white hover:bg-[#FAF5EE] text-[#4E5D52] text-xs font-semibold flex items-center space-x-1.5 shadow-2xs transition-colors"
+          >
+            <Sparkles className="w-4 h-4 text-[#4E5D52]" />
+            <span>Auto-Scan Knowledge Gaps</span>
+          </button>
+          <button
+            onClick={() => setShowNewQModal(true)}
+            className="py-2 px-3.5 rounded-xl bg-[#4E5D52] hover:bg-[#3A473E] text-white text-xs font-semibold flex items-center space-x-1.5 shadow-xs transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Ask Gap Question</span>
+          </button>
+        </div>
       </div>
 
       {/* Questions Stream */}
@@ -114,10 +132,22 @@ export function KnowledgeGapsView() {
               key={q.id}
               className="p-5 rounded-2xl border border-[#E5D5BF] bg-white shadow-2xs space-y-3"
             >
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-[#8B968D] font-medium">
-                  Directed to: <strong className="text-[#222B25]">{q.target_user_name}</strong>
-                </span>
+              <div className="flex flex-wrap items-center justify-between text-xs gap-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-[#8B968D] font-medium">
+                    Directed to: <strong className="text-[#222B25]">{q.target_user_name}</strong>
+                  </span>
+                  {q.priority && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FAF5EE] text-[#63513C] border border-[#C9B79E]">
+                      {q.priority} Priority
+                    </span>
+                  )}
+                  {q.category && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EFF3ED] text-[#323F36] border border-[#A6B29C]">
+                      {q.category}
+                    </span>
+                  )}
+                </div>
                 <span
                   className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
                     isAnswered

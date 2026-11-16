@@ -4,7 +4,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 import hashlib
 from app.core.database import get_db
-from app.core.security import get_current_user, get_optional_current_user
+from app.core.security import get_current_user, get_optional_current_user, is_manager_or_admin, log_audit_event
 from app.core.dlp import mask_sensitive_tokens
 from app.models.models import (
     HandoverCase, HandoverReport, HandoverAcknowledgement,
@@ -171,10 +171,27 @@ def acknowledge_handover_receipt(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Allows the successor to sign and acknowledge receipt of the handover package."""
+    """Allows only the assigned successor (or Admin) to sign and acknowledge receipt of the handover package."""
     case = db.query(HandoverCase).filter(HandoverCase.id == case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+        
+    # Authorization check: only assigned successor or system admin can sign
+    if case.successor_user_id and current_user.id != case.successor_user_id and "admin" not in (current_user.role or "").lower():
+        log_audit_event(
+            db=db,
+            user_id=current_user.id,
+            user_name=current_user.full_name,
+            user_role=current_user.role,
+            action="RESTRICTED_ACCESS_DENIED",
+            entity_type="HandoverCase",
+            entity_id=case.case_number,
+            details_json={"reason": "Unauthorized handover acknowledgment attempt: Only assigned successor can sign"}
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: Only the assigned successor can acknowledge and sign receipt for this handover."
+        )
         
     sig = hashlib.sha256(f"ACK:{current_user.email}:{datetime.now(timezone.utc).isoformat()}".encode("utf-8")).hexdigest()
     sig_token = f"sha256:{sig[:8]}...{sig[-6:]}"
@@ -191,7 +208,8 @@ def acknowledge_handover_receipt(
     case.status = "Acknowledged & Cutover Active"
     case.completed_at = datetime.now(timezone.utc)
     
-    audit = AuditLog(
+    log_audit_event(
+        db=db,
         user_id=current_user.id,
         user_name=current_user.full_name,
         user_role=current_user.role,
@@ -200,7 +218,6 @@ def acknowledge_handover_receipt(
         entity_id=case.case_number,
         details_json={"signature": sig_token, "notes": payload.notes}
     )
-    db.add(audit)
     db.commit()
     db.refresh(ack)
     
@@ -222,10 +239,26 @@ def approve_handover_by_manager(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Manager Gate sign-off to authorize cutover."""
+    """Manager Gate sign-off to authorize cutover. Only authorized managers or admins can sign off."""
     case = db.query(HandoverCase).filter(HandoverCase.id == case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+
+    if not is_manager_or_admin(current_user):
+        log_audit_event(
+            db=db,
+            user_id=current_user.id,
+            user_name=current_user.full_name,
+            user_role=current_user.role,
+            action="RESTRICTED_ACCESS_DENIED",
+            entity_type="HandoverCase",
+            entity_id=case.case_number,
+            details_json={"reason": "Unauthorized handover approval attempt: Manager or Admin role required"}
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: Only authorized managers or administrators can approve handovers."
+        )
         
     report = db.query(HandoverReport).filter(HandoverReport.handover_case_id == case_id).first()
     if report:
@@ -236,7 +269,8 @@ def approve_handover_by_manager(
     case.status = "Cutover Authorized · Ready for Sign-off"
     case.stage = "Stage 5 of 5 · Final Cutover Execution"
     
-    audit = AuditLog(
+    log_audit_event(
+        db=db,
         user_id=current_user.id,
         user_name=current_user.full_name,
         user_role=current_user.role,
@@ -245,7 +279,6 @@ def approve_handover_by_manager(
         entity_id=case.case_number,
         details_json={"authorized_by": current_user.full_name}
     )
-    db.add(audit)
     db.commit()
     
     return {"status": "success", "message": "Handover authorized and transition package published."}

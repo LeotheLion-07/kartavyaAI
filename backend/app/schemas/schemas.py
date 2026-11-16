@@ -91,6 +91,8 @@ class ClaimBase(BaseModel):
     title: str
     description: str
     category: str = "Decision"
+    entity_or_subject: Optional[str] = None
+    extracted_value: Optional[str] = None
     evidence_status: str = "VERIFIED"
     confidence_score: float = 1.0
     verification_method: str = "Exact Match"
@@ -213,15 +215,23 @@ class ConflictBase(BaseModel):
     conflict_code: str
     title: str
     description: str
+    category: Optional[str] = "Ownership"
+    entity_or_subject: Optional[str] = None
+    detection_reason: Optional[str] = None
+    claim_a_id: Optional[int] = None
+    claim_b_id: Optional[int] = None
     source_a_label: Optional[str] = None
     source_a_quote: Optional[str] = None
     source_a_claim: Optional[str] = None
+    source_a_value: Optional[str] = None
     source_b_label: Optional[str] = None
     source_b_quote: Optional[str] = None
     source_b_claim: Optional[str] = None
+    source_b_value: Optional[str] = None
     recommended_fix: Optional[str] = None
     resolution_status: str = "Pending"
     resolution_notes: Optional[str] = None
+    access_classification: Optional[str] = "Team"
 
 class ConflictCreate(ConflictBase):
     project_id: int
@@ -230,6 +240,7 @@ class ConflictCreate(ConflictBase):
 class ConflictResolve(BaseModel):
     resolution_notes: str
     accepted_fix: Optional[str] = None
+    resolution_status: Optional[str] = "Resolved" # "Resolved", "Unresolved", "Rejected"
 
 class ConflictResponse(ConflictBase):
     id: int
@@ -246,11 +257,15 @@ class ConflictResponse(ConflictBase):
 class KnowledgeGapBase(BaseModel):
     question: str
     rationale: Optional[str] = None
+    category: Optional[str] = "DecisionRationale"
+    entity_or_subject: Optional[str] = None
+    priority: Optional[str] = "High"
     target_user_name: Optional[str] = "Sarah Lin (Departing Lead)"
 
 class KnowledgeGapCreate(KnowledgeGapBase):
     project_id: int
     handover_case_id: Optional[int] = None
+    source_id: Optional[int] = None
 
 class KnowledgeGapAnswer(BaseModel):
     answer: str
@@ -260,6 +275,7 @@ class KnowledgeGapResponse(KnowledgeGapBase):
     id: int
     project_id: int
     status: str
+    source_id: Optional[int] = None
     answer: Optional[str] = None
     answered_at: Optional[datetime] = None
     respondent_name: Optional[str] = None
@@ -365,6 +381,8 @@ class Citation(BaseModel):
     claim_code: str
     title: str
     source_name: str
+    source_type: Optional[str] = None
+    source_id: Optional[int] = None
     exact_quote: str
     line_span: Optional[str] = None
     confidence: float
@@ -373,6 +391,7 @@ class GroundedChatResponse(BaseModel):
     query: str
     answer: str
     is_grounded: bool
+    has_conflict: Optional[bool] = False
     evidence_count: int
     citations: List[Citation]
     redacted_items_count: int = 0

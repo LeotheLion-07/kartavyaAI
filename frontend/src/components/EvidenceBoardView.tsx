@@ -177,82 +177,113 @@ export function EvidenceBoardView({ onOpenConflictModal }: EvidenceBoardViewProp
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
-          {/* Unresolved Ambiguity / Conflict Card */}
-          <div className="p-5 rounded-2xl border border-[#C9B79E] bg-white shadow-2xs space-y-4">
+          {/* Automated Conflict Detection Ledger */}
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2 text-xs font-bold text-[#63513C] uppercase tracking-wider">
                 <span className="w-2 h-2 rounded-full bg-[#C9B79E] animate-ping" />
-                <span>Unresolved Ambiguity • Conflict #882</span>
+                <span>Automated Conflict Detection Ledger ({conflicts.length})</span>
               </div>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                isConflictResolved
-                  ? "bg-[#EFF3ED] text-[#323F36] border border-[#A6B29C]"
-                  : "bg-[#FAF5EE] text-[#63513C] border border-[#C9B79E]"
-              }`}>
-                {isConflictResolved ? "Resolved" : "Action Required"}
-              </span>
+              <button
+                onClick={async () => {
+                  try {
+                    await api.detectConflicts(currentProject.id);
+                    fetchData();
+                  } catch (e: any) {
+                    alert(e.message);
+                  }
+                }}
+                className="py-1 px-2.5 rounded-lg border border-[#E5D5BF] bg-white hover:bg-[#FAF5EE] text-[11px] font-semibold text-[#4E5D52] shadow-2xs transition-colors"
+              >
+                Scan for Contradictions
+              </button>
             </div>
 
-            <div>
-              <h3 className="text-sm font-bold text-[#222B25]">
-                Webhook Failover Circuit Breaker Ownership Discrepancy
-              </h3>
-              <p className="text-xs text-[#5E6F63] mt-1 leading-relaxed">
-                Two canonical systems assign differing primary on-call tiers for the Stripe & Adyen webhook reconciliation pipeline. This creates critical operational ambiguity for the successor during an outage.
-              </p>
-            </div>
+            {conflicts.length === 0 ? (
+              <div className="p-5 rounded-2xl border border-[#A6B29C] bg-[#EFF3ED] text-xs text-[#323F36] flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-[#4E5D52]" />
+                <span>No contradictory assertions detected across verified project sources.</span>
+              </div>
+            ) : (
+              conflicts.map((conf) => {
+                const isResolved = conf.resolution_status === "Resolved";
+                return (
+                  <div
+                    key={conf.id}
+                    className="p-5 rounded-2xl border border-[#C9B79E] bg-white shadow-2xs space-y-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-xs font-bold text-[#63513C] uppercase tracking-wider">
+                        <span>{conf.conflict_code}</span>
+                        <span>•</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EFF3ED] text-[#323F36] border border-[#A6B29C]">
+                          {conf.category || "Ownership"} Discrepancy
+                        </span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          isResolved
+                            ? "bg-[#EFF3ED] text-[#323F36] border border-[#A6B29C]"
+                            : "bg-[#FAF5EE] text-[#63513C] border border-[#C9B79E]"
+                        }`}
+                      >
+                        {conf.resolution_status || "Pending Review"}
+                      </span>
+                    </div>
 
-            {/* Side-by-side sources */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="p-3 rounded-xl border border-[#E5D5BF] bg-[#FAF5EE] text-xs space-y-2">
-                <div className="flex justify-between text-[10px] text-[#8B968D]">
-                  <span className="font-semibold text-[#222B25]">Codebase PR #1420</span>
-                  <span>Sep 12</span>
-                </div>
-                <div className="font-mono text-[11px] text-[#222B25] bg-white p-2 rounded border border-[#E5D5BF] italic">
-                  // circuit_breaker.go: line 104<br />
-                  // Delegated to Core Infra SRE<br />
-                  circuit.Notify("pagerduty:core-sre");
-                </div>
-                <div className="text-[11px] text-[#63513C] font-medium">
-                  Claim: Core Infra SRE owns manual overrides
-                </div>
-              </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-[#222B25]">{conf.title}</h3>
+                      <p className="text-xs text-[#5E6F63] mt-1 leading-relaxed">
+                        {conf.detection_reason || conf.description}
+                      </p>
+                    </div>
 
-              <div className="p-3 rounded-xl border border-[#E5D5BF] bg-[#FAF5EE] text-xs space-y-2">
-                <div className="flex justify-between text-[10px] text-[#8B968D]">
-                  <span className="font-semibold text-[#222B25]">Arch Sync Notes (Slack)</span>
-                  <span>Oct 04</span>
-                </div>
-                <div className="font-mono text-[11px] text-[#222B25] bg-white p-2 rounded border border-[#E5D5BF] italic">
-                  "Sarah agreed Payments Pod owns manual drain triggers until Q1-25. SRE only receives metric pings."
-                </div>
-                <div className="text-[11px] text-[#4E5D52] font-medium">
-                  Claim: Payments Pod (Marcus) retains override triggers
-                </div>
-              </div>
-            </div>
+                    {/* Side-by-side sources */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="p-3 rounded-xl border border-[#E5D5BF] bg-[#FAF5EE] text-xs space-y-2">
+                        <div className="flex justify-between text-[10px] text-[#8B968D]">
+                          <span className="font-semibold text-[#222B25]">{conf.source_a_label || "Source A"}</span>
+                        </div>
+                        <div className="font-mono text-[11px] text-[#222B25] bg-white p-2 rounded border border-[#E5D5BF] italic">
+                          "{conf.source_a_quote || "Evidence quote from source A"}"
+                        </div>
+                        <div className="text-[11px] text-[#63513C] font-medium">
+                          Claim: {conf.source_a_claim || conf.source_a_value}
+                        </div>
+                      </div>
 
-            {/* Recommended Fix Box & Action */}
-            <div className="p-3.5 rounded-xl border border-[#A6B29C] bg-[#EFF3ED] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-              <div className="text-[#323F36]">
-                <span className="font-bold">Recommended Fix:</span> Assign Payments Pod L2 triage; SRE retains automated restart without raw API tokens.
-              </div>
-              <div className="flex space-x-2 shrink-0">
-                <button
-                  onClick={() => setSelectedConflict(conflicts[0] || { id: 1, conflict_code: "CONF-882", title: "Webhook Circuit Breaker Ownership", description: "Discrepancy between PR and Slack" })}
-                  className="py-1.5 px-3 rounded-lg bg-[#4E5D52] hover:bg-[#3A473E] text-white font-semibold transition-colors shadow-2xs"
-                >
-                  Accept Resolution
-                </button>
-                <button
-                  onClick={() => alert("15-Min Exit sync requested.")}
-                  className="py-1.5 px-3 rounded-lg border border-[#E5D5BF] bg-white text-[#4E5D52] hover:bg-[#FAF5EE] text-xs font-medium"
-                >
-                  15-min Exit Sync
-                </button>
-              </div>
-            </div>
+                      <div className="p-3 rounded-xl border border-[#E5D5BF] bg-[#FAF5EE] text-xs space-y-2">
+                        <div className="flex justify-between text-[10px] text-[#8B968D]">
+                          <span className="font-semibold text-[#222B25]">{conf.source_b_label || "Source B"}</span>
+                        </div>
+                        <div className="font-mono text-[11px] text-[#222B25] bg-white p-2 rounded border border-[#E5D5BF] italic">
+                          "{conf.source_b_quote || "Evidence quote from source B"}"
+                        </div>
+                        <div className="text-[11px] text-[#4E5D52] font-medium">
+                          Claim: {conf.source_b_claim || conf.source_b_value}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Recommended Fix Box & Action */}
+                    <div className="p-3.5 rounded-xl border border-[#A6B29C] bg-[#EFF3ED] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                      <div className="text-[#323F36]">
+                        <span className="font-bold">Recommendation:</span>{" "}
+                        {conf.resolution_notes || conf.recommended_fix || "Review and confirm authoritative state."}
+                      </div>
+                      <div className="flex space-x-2 shrink-0">
+                        <button
+                          onClick={() => setSelectedConflict(conf)}
+                          className="py-1.5 px-3 rounded-lg bg-[#4E5D52] hover:bg-[#3A473E] text-white font-semibold transition-colors shadow-2xs"
+                        >
+                          {isResolved ? "Inspect Resolution" : "Review & Resolve"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
 
           {/* Synthesized Handover Document */}

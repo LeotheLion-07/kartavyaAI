@@ -147,6 +147,7 @@ class SourceChunk(Base):
     line_end = Column(Integer, default=10)
     text_content = Column(Text, nullable=False)
     embedding_json = Column(JSON, nullable=True)
+    access_classification = Column(String(50), default="Team")
 
     source = relationship("Source", back_populates="chunks")
 
@@ -159,7 +160,9 @@ class Claim(Base):
     handover_case_id = Column(Integer, ForeignKey("handover_cases.id"), nullable=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
-    category = Column(String(100), default="Decision") # Decision, Owner, TaskStatus, Blocker, Dependency, Risk, OpenQuestion, NextAction, Deadline, UnfinishedWork
+    category = Column(String(100), default="Decision") # Decision, Ownership, TaskStatus, Blocker, Dependency, Risk, OpenQuestion, NextAction, Deadline, UnfinishedWork
+    entity_or_subject = Column(String(255), nullable=True) # Normalized entity / component
+    extracted_value = Column(String(255), nullable=True) # Specific extracted value or assignment
     evidence_status = Column(String(50), default=EvidenceStatus.VERIFIED.value) # VERIFIED, INFERRED, CONFLICTING, MISSING EVIDENCE
     confidence_score = Column(Float, default=1.0)
     verification_method = Column(String(100), default="Exact Match") # AST Proved, Exact Match, BFT Consensus, NLP Inferred
@@ -250,19 +253,25 @@ class Conflict(Base):
     handover_case_id = Column(Integer, ForeignKey("handover_cases.id"), nullable=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
+    category = Column(String(100), default="Ownership") # Ownership, Decision, TaskCompletion, Deadline, Dependency
+    entity_or_subject = Column(String(255), nullable=True) # Normalized topic, component, or task
+    detection_reason = Column(Text, nullable=True) # Explanation of the contradiction
     claim_a_id = Column(Integer, ForeignKey("claims.id"), nullable=True)
     claim_b_id = Column(Integer, ForeignKey("claims.id"), nullable=True)
     source_a_label = Column(String(255), nullable=True) # e.g. Codebase PR #1420 (Sep 12)
     source_a_quote = Column(Text, nullable=True)
     source_a_claim = Column(String(255), nullable=True)
+    source_a_value = Column(String(255), nullable=True)
     source_b_label = Column(String(255), nullable=True) # e.g. Arch Sync Notes Slack (Oct 04)
     source_b_quote = Column(Text, nullable=True)
     source_b_claim = Column(String(255), nullable=True)
+    source_b_value = Column(String(255), nullable=True)
     recommended_fix = Column(Text, nullable=True)
-    resolution_status = Column(String(50), default="Pending") # Pending, Resolved
+    resolution_status = Column(String(50), default="Pending") # Pending, Resolved, Unresolved, Rejected
     resolved_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     resolution_notes = Column(Text, nullable=True)
     resolved_at = Column(DateTime, nullable=True)
+    access_classification = Column(String(50), default="Team") # Inherited from claims/sources
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     project = relationship("Project", back_populates="conflicts")
@@ -274,10 +283,14 @@ class KnowledgeGapQuestion(Base):
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     handover_case_id = Column(Integer, ForeignKey("handover_cases.id"), nullable=True)
+    category = Column(String(100), default="DecisionRationale") # DecisionRationale, Ownership, TaskStatus, BlockerResolution, Dependency, Risk, NextAction, Deadline, UnfinishedWork
+    entity_or_subject = Column(String(255), nullable=True)
+    priority = Column(String(50), default="High") # High, Medium, Low
     question = Column(Text, nullable=False)
     rationale = Column(Text, nullable=True)
     target_user_name = Column(String(255), default="Sarah Lin (Departing Lead)")
     target_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    source_id = Column(Integer, ForeignKey("sources.id"), nullable=True)
     status = Column(String(50), default="Open") # Open, Answered
     answer = Column(Text, nullable=True)
     answered_at = Column(DateTime, nullable=True)

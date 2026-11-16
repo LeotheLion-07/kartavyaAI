@@ -65,6 +65,73 @@ def get_optional_current_user(token: Optional[str] = Depends(oauth2_scheme), db:
     except HTTPException:
         return None
 
+def is_manager_or_admin(user) -> bool:
+    if not user:
+        return False
+    role = (user.role or "").lower()
+    return "admin" in role or "manager" in role
+
+def log_audit_event(
+    db: Session,
+    user_id: Optional[int],
+    user_name: str,
+    user_role: str,
+    action: str,
+    entity_type: Optional[str] = None,
+    entity_id: Optional[str] = None,
+    details_json: Optional[dict] = None,
+    ip_address: str = "127.0.0.1"
+):
+    from app.models.models import AuditLog
+    from app.core.dlp import mask_sensitive_tokens
+    
+    # Sanitize details_json if string values exist
+    sanitized_details = None
+    if details_json:
+        sanitized_details = {}
+        for k, v in details_json.items():
+            if isinstance(v, str):
+                sanitized_details[k] = mask_sensitive_tokens(v)
+            else:
+                sanitized_details[k] = v
+                
+    audit = AuditLog(
+        user_id=user_id,
+        user_name=user_name,
+        user_role=user_role,
+        action=action,
+        entity_type=entity_type,
+        entity_id=str(entity_id) if entity_id is not None else None,
+        details_json=sanitized_details,
+        ip_address=ip_address,
+        timestamp=datetime.now(timezone.utc)
+    )
+    db.add(audit)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+
+def verify_project_membership(project_id: int, user, db: Session) -> bool:
+    from app.models.models import Project, ProjectMember
+    if not user:
+        return False
+    # Admins have universal system access
+    if "admin" in (user.role or "").lower():
+        return True
+    # Check if project owner
+    proj = db.query(Project).filter(Project.id == project_id).first()
+    if not proj:
+        return False
+    if proj.owner_id == user.id:
+        return True
+    # Check ProjectMember table
+    membership = db.query(ProjectMember).filter(
+        ProjectMember.project_id == project_id,
+        ProjectMember.user_id == user.id
+    ).first()
+    return membership is not None
+
 def require_roles(allowed_roles: List[str]):
     def role_checker(current_user = Depends(get_current_user)):
         # Normalize role string (e.g., "admin", "manager", "departing", "incoming")

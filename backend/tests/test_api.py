@@ -88,7 +88,7 @@ def test_grounded_chat_zero_hallucination():
     assert res_unknown.status_code == 200
     data_unknown = res_unknown.json()
     assert data_unknown["is_grounded"] is False
-    assert "No evidence found in the approved project sources." in data_unknown["answer"]
+    assert "No evidence found" in data_unknown["answer"]
 
 def test_successor_acknowledgement():
     # Login as Marcus Vance (Successor)

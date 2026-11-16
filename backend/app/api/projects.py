@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db
-from app.core.security import get_current_user, get_optional_current_user
+from app.core.security import get_current_user, get_optional_current_user, verify_project_membership, log_audit_event
 from app.models.models import Project, ProjectMember, Claim, Source, User, AuditLog
 from app.schemas.schemas import ProjectCreate, ProjectUpdate, ProjectResponse
 
@@ -49,10 +49,27 @@ def create_project(project_in: ProjectCreate, current_user: User = Depends(get_c
     return project
 
 @router.get("/{project_id}")
-def get_project_details(project_id: int, db: Session = Depends(get_db)):
+def get_project_details(
+    project_id: int,
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db)
+):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    if current_user and not verify_project_membership(project_id, current_user, db):
+        log_audit_event(
+            db=db,
+            user_id=current_user.id,
+            user_name=current_user.full_name,
+            user_role=current_user.role,
+            action="RESTRICTED_ACCESS_DENIED",
+            entity_type="Project",
+            entity_id=str(project_id),
+            details_json={"reason": "User is not a member of this project"}
+        )
+        raise HTTPException(status_code=403, detail="Access denied: User is not a member of this project")
         
     members = db.query(ProjectMember).filter(ProjectMember.project_id == project_id).all()
     member_list = []
