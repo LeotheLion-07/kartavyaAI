@@ -13,6 +13,13 @@ const nextConfig: NextConfig = {
     },
   },
   async rewrites() {
+    // Vercel services routing is the source of truth for deployed apps.
+    // Do not add a frontend-level API proxy when the app is running on Vercel,
+    // otherwise the browser may hit the wrong backend target or duplicate route prefixes.
+    if (process.env.VERCEL === "1" || process.env.VERCEL === "true") {
+      return [];
+    }
+
     const backendTarget =
       process.env.BACKEND_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
@@ -20,7 +27,7 @@ const nextConfig: NextConfig = {
 
     if (!backendTarget) return [];
 
-    // Strip trailing /api/v1 or /api to avoid duplicated path prefix
+    // Strip trailing /api/v1 or /api to avoid duplicated path prefix.
     const cleanTarget = backendTarget.replace(/\/api(\/v1)?\/?$/, "").replace(/\/+$/, "");
 
     return [
