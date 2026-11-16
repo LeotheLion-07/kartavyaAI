@@ -153,6 +153,12 @@ This spins up:
 - FastAPI backend on port 8000
 - Next.js frontend on port 3000
 
+### Option C: Deploy both services on Vercel
+
+Import the repository as **one Vercel project** and leave its **Root Directory** set to the repository root (`.`). Do not set it to `frontend/` or `backend/`: the root [`vercel.json`](./vercel.json) defines both services and routes `/api/*` to FastAPI.
+
+The frontend uses the same-origin `/api/v1` path, so no `NEXT_PUBLIC_API_URL` or manually configured `BACKEND_URL` is needed. Vercel injects the backend binding automatically. Set a unique `SECRET_KEY` in Vercel project environment variables before deploying. For data that must survive function restarts, also configure `DATABASE_URL` to a persistent PostgreSQL database; the default Vercel SQLite file is temporary.
+
 ---
 
 ## 6. Running Automated Tests
