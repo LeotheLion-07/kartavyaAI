@@ -58,8 +58,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("kartavya_theme", "light");
     document.documentElement.classList.remove("dark");
 
-    // Load sample users & initial session with serverless cold-start retry & fallback resilience
-    const initAuth = async (isRetry = false) => {
+    // Load sample users & initial session directly from backend
+    const initAuth = async () => {
       try {
         const users = await api.getSampleUsers();
         if (users && users.length > 0) {
@@ -82,44 +82,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (err) {
-        console.warn("Auth initialization notice:", err);
-        if (!isRetry) {
-          // Retry once after 1.5s to handle serverless cold boot
-          setTimeout(() => initAuth(true), 1500);
-          return;
-        }
-        // Fallback demo users for graceful UI rendering during backend maintenance
-        const fallbackUsers: User[] = [
-          {
-            id: 1,
-            email: "alex.morgan@company.internal",
-            full_name: "Alex Morgan",
-            role: "Manager",
-            title: "Engineering Manager",
-            department: "Core Payments",
-            avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-          },
-          {
-            id: 2,
-            email: "sarah.lin@company.internal",
-            full_name: "Sarah Lin",
-            role: "Staff Engineer (Departing)",
-            title: "Staff Lead L6",
-            department: "Core Payments",
-            avatar_url: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80",
-          },
-          {
-            id: 3,
-            email: "marcus.vance@company.internal",
-            full_name: "Marcus Vance",
-            role: "Successor",
-            title: "Senior L5 Successor",
-            department: "Core Payments",
-            avatar_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
-          },
-        ];
-        setSampleUsers(fallbackUsers);
-        setUser(fallbackUsers[0]);
+        console.error("Authentication initialization failed: unable to fetch from backend API.", err);
+        // Do not fake authentication if backend is unreachable
+        setUser(null);
+        setSampleUsers([]);
       } finally {
         setLoading(false);
       }

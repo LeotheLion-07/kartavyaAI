@@ -13,6 +13,10 @@ export function getApiBase(): string {
     return process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "");
   }
 
+  if (process.env.BACKEND_URL) {
+    return `${process.env.BACKEND_URL.replace(/\/+$/, "")}/api/v1`;
+  }
+
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname;
     const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
@@ -21,8 +25,8 @@ export function getApiBase(): string {
     }
   }
 
-  if (process.env.BACKEND_URL) {
-    return `${process.env.BACKEND_URL.replace(/\/+$/, "")}/api/v1`;
+  if (process.env.NODE_ENV === "production") {
+    return "/api/v1";
   }
 
   return "http://localhost:8000/api/v1";
